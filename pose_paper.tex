@@ -186,14 +186,13 @@
 % does. amsmath.sty is already installed on most LaTeX systems. The latest
 % version and documentation can be obtained at:
 % http://www.ctan.org/tex-archive/macros/latex/required/amslatex/math/
-
+\usepackage{mathtools}
 
 
 
 
 % *** SPECIALIZED LIST PACKAGES ***
 %
-%\usepackage{algorithmic}
 % algorithmic.sty was written by Peter Williams and Rogerio Brito.
 % This package provides an algorithmic environment fo describing algorithms.
 % You can use the algorithmic environment in-text or within a figure
@@ -209,6 +208,8 @@
 % Also of interest may be the (relatively newer and more customizable)
 % algorithmicx.sty package by Szasz Janos:
 % http://www.ctan.org/tex-archive/macros/latex/contrib/algorithmicx/
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 
 
 
@@ -325,7 +326,7 @@
 
 % *** PDF, URL AND HYPERLINK PACKAGES ***
 %
-%\usepackage{url}
+\usepackage{url}
 % url.sty was written by Donald Arseneau. It provides better support for
 % handling and breaking URLs. url.sty is already installed on most LaTeX
 % systems. The latest version can be obtained at:
@@ -417,7 +418,9 @@ dhj0001@auburn.edu
 
 \begin{abstract}
 %\boldmath
-The DymaFlight satellite is a microsatellite consisting of a high performance manipulator attached to a base, and is designed to performed tasks analogous to satellite servicing. For validation of the coupled dynamics of base and manipulator movement during testing, a (easy to use) system to track the position and orientation, or pose, of the satellite base in 6DOF is required. We present an application designed to track the position and orientation of a rigid body with full 6DOF motion range using multiple planar fiducial markers. The framework utilizes ARToolkit, a library for augmented reality applications, and is built on top of ar\_pose, a ROS (Robot Operating System) wrapper for ARToolkit. 
+The DymaFlight satellite is a microsatellite consisting of a high performance manipulator attached to a base, and is designed to performed tasks analogous to satellite servicing. 
+For validation of the coupled dynamics of base and manipulator movement during testing, an easy to use system to track the position and orientation, or pose, of the satellite base in 6DOF is required. 
+We present an application designed to track the position and orientation of a rigid body with full 6DOF motion range using multiple non co-planar fiducial markers. The framework utilizes ARToolkit, a library for augmented reality applications, and is built on top of ar\_pose, a ROS (Robot Operating System) wrapper for ARToolkit. 
 
 
 \end{abstract}
@@ -445,30 +448,88 @@ The DymaFlight satellite is a microsatellite consisting of a high performance ma
 
 
 \section{Introduction}
+Tracking the position and orientation of an object in real time is a problem that has several applications and uses. \cite{lepetit2005monocular} gives a broad overview of monocular, model based methods for 3D tracking of rigid objects, dividing the methods into marker and non-marker based. 
+For marker-free tracking, \cite{gordon2006and} uses feature extraction from several images to build an internal 3d model, then tracks pose using this model.
+However, this approach assumes a static, unchanging object. 
+Marker based tracking does not necessarily have this constraint, as long as the marker's relative pose to the object stays constant. In marker based tracking, all tracking uses easily identifiable fiducial markers. 
+ARToolkit is a widely used library that enables marker based pose tracking. Much work has been done in using ARToolkit for pose tracking. \cite{piekarski2002using} uses ARToolkit to track the 3D position in real world coordinates of a user’s hand for mobile applications; \cite{wagner2007artoolkitplus} optimizes ARToolkit to produce ARToolkitPlus, a library tailored toward pose tracking on mobile devices.
 
-ARToolkit is a widely used library for Augmented Reality (AR) applications. ARToolkit uses planar fiducial markers to track the position and orientation of the marker relative to the camera frame, and is easy to use and set up, requiring only a camera and the printed markers. However, there is a limit to the range of rotation where the fiducial is still recognizable - [abawi] indicates that once the camera’s relative angle to the marker is past 80 degrees (where 0 degrees is a full, non-angled view of the fiducial), the fiducial becomes undetectable. This becomes an issue when attempting to track an object that may rotate more than the detectable amount. 
+ARToolkit uses planar fiducial markers to track the position and orientation of the marker relative to the camera frame, and is easy to use and set up, requiring only a camera and the printed markers. However, there is a limit to the range of rotation where the fiducial is still recognizable - \cite{abawi2004accuracy} indicates that once the camera's relative angle to the marker is past 80 degrees (where 0 degrees is a full, non-angled view of the fiducial), the fiducial becomes undetectable. This becomes an issue when attempting to track an object that may rotate more than the detectable amount. 
 
-Our framework is designed to track the pose of a rigid body with full (rotational movement)//
+Our application is designed to track the pose of a rigid body through a full rotational, 6DOF space (how to word this??). We extend ar\_pose, an existing Robot Operating System (ROS) package, to track an object using multiple attached, non co-planar fiducial markers, thus overcoming the limitation of pattern visibility and extending the trackable range of rotation. 
 
+In section \ref{sec:problem}, we present our problem description. In section \ref{sec:implementation}, we describe package implementation. We conclude in section \ref{sec:future} with a description of future work.
 
+\section{Problem Description}
+\label{sec:problem}
+(I REALLY don’t know where to put this.. hard to fit in the intro, but clunky in its own section)
 
-In section \ref{sec:bg},we present an overview and background of previous related work. In section \ref{sec:implementation}, we describe package implementation. We conclude in section \ref{sec:future} with a description of future work.
+The DymaFlight satellite is a microsatellite consisting of a base and an attached manipulator. 
+As a microsatellite, DymaFlight is smaller, lighter, faster, and lower cost due to its small size and mass; however, the size introduces significant coupled dynamics between the base and manipulator. 
+The dynamics between the base and the manipulator will be observed during testing in two main arenas: on an air bearing table, restricting the movement to a 2d plane, and in parabolic flight, simulating microgravity. 
+Pose data of the satellite base will be gathered during testing, requiring an efficient and low overhead pose tracking application capable of tracking in 6DOF space. 
 
-
-
-\section{Background}
-\label{sec:bg}
 
 \section{Implementation}
 \label{sec:implementation}
+Our application is implemented using Robot Operating System (ROS). ROS is a library designed for robotic applications, and makes it easy for applications with several independent modules called nodes to communicate with each other. In addition, ROS provides a variety of visualization tools and libraries divided conceptually into packages. 
+
+The ar\_pose package \cite{arpose}  is a ROS wrapper for the ARToolkit library. 
+It provides two nodes that uses a video feed from a camera to track single and multiple markers.
+ARToolkit provides a function {\tt arGetTransMat()}that calculates the transformation matrix representing the transform of a given marker frame with respect to the camera frame. Once the transforms of the markers is retrieved, the original node outputs these transforms and displays the visualization for each marker. 
+
+\begin{algorithm*}
+\caption{Multi Marker Detection - modified}\label{alg:multi}
+\begin{algorithmic}[1]
+\State Detect all markers in camera image.
+\ForAll {expected markers}
+	\State Go through all detected markers that match expected marker, and choose marker with highest confidence value.
+	\If {expected marker was not found}
+		\State continue to next expected marker.
+	\Else
+		\State	Get transformation of marker frame with respect to camera frame.
+		\State  Lookup transformation of master frame with respect to given marker frame.	
+		\State  Calculate and return final transformation of master frame with respect to camera frame.
+	\EndIf
+\State  
+\EndFor
+\end{algorithmic}
+\end{algorithm*}
 
 
+We implement an additional node to track a single object using multiple markers in algorithm \ref{alg:multi}. Our implementation modifies the original tracking algorithm to output the final, “master” visualization representing the pose of the actual tracked object instead of the individual markers. 
+Two input files are required - one that lists information for all markers that are being tracked, and one that lists the transformation matrices containing the rotational and positional offsets of each marker to the center of the object, modeling the object as a point.
+ARToolkit provides the transformation matrix representing the transform of a given marker with respect to the camera frame. To calculate the final transform of the master frame with respect to the camera frame, we //
+
+\[^{cam}_{master}T = ^{cam}_{marker}T * ^{marker}_{master}T\]
+
+For testing, we attach one marker to each of the four outward sides of a rectangular box, simulating the base of the microsatellite.  
+Future optimizations (TODO)
+Because our application is designed to track a single object through the multiple markers, there is no need to look for all available markers - once a marker is found, the pose of the object itself can be calculated.
+*Insert a picture of the box here. (TODO)*
+
+\section{Results}
+\label{sec:results}
+
+Results go here. 
+Possible tests - how does size of marker affect accuracy? what is most efficient placement of marker(s?) more than one marker per face for accuracy? 
+
+marker size affect on accuracy
+\begin{itemize}
+  	\item one HUGE marker on each face 
+    \item two medium markers on each face
+\end{itemize}
+
+marker configuration affect on accuracy.
+\begin{itemize}
+  	\item one marker in center of each face 
+    \item two markers on each face, diagonally opposite 
+	\item four markers in each corner of each face ? (probably not feasible and overkill). 
+\end{itemize}
 \section{Future Work}
 \label{sec:future}
-
-\subsection{Integration with Ground Control}
-
-\subsection{XBee Networking}
+(TODO) - Look more at world coordinates (how ROS translates them v ARToolkit)
+- Develop the script to automatically calculate inter marker transform?
 
 
 
