@@ -353,7 +353,7 @@
 %
 % paper title
 % can use linebreaks \\ within to get better formatting as desired
-\title{6DOF Pose Tracking of Rigid Bodies using ARToolkit }
+\title{Pose Tracking of Rigid Bodies in 6DOF using ARToolkit }
 
 
 % author names and affiliations
@@ -366,17 +366,11 @@ University of Missouri - Kansas City\\
 Kansas City, Missouri\\
 vcw7c5@mail.umkc.edu}
 \and
-\IEEEauthorblockN{Example}
+\IEEEauthorblockN{Dr. David L. Akin}
 \IEEEauthorblockA{
-Auburn University\\
-Auburn, Alabama\\
-biazsaa@auburn.edu}
-\and
-\IEEEauthorblockN{David Jones}
-\IEEEauthorblockA{
-Auburn University\\
-Auburn, Alabama\\
-dhj0001@auburn.edu
+Space Systems Laboratory\\
+University of Maryland, USA\\
+dakin@ssl.umd.edu
 }
 
 }
@@ -419,10 +413,10 @@ dhj0001@auburn.edu
 \begin{abstract}
 %\boldmath
 The DymaFlight satellite is a microsatellite consisting of a high performance manipulator attached to a base, and is designed to performed tasks analogous to satellite servicing. 
-For validation of the coupled dynamics of base and manipulator movement during testing, an easy to use system to track the position and orientation, or pose, of the satellite base in 6DOF is required. 
-We present an application designed to track the position and orientation of a rigid body with full 6DOF motion range using multiple non co-planar fiducial markers. The framework utilizes ARToolkit, a library for augmented reality applications, and is built on top of ar\_pose, a ROS (Robot Operating System) wrapper for ARToolkit. 
-
-
+Micro satellites are lighter and consume less resources than their traditional counterparts, but because of the small size and mass, manipulator movement will cause the base to move in reaction in microgravity. 
+For validation of the coupled dynamics of base and manipulator movement during testing, a system to track the position and orientation, or pose, of the satellite base in 6DOF is required. 
+Presented is an application designed to track the pose of a rigid body with full rotational motion range using multiple planar markers. 
+The framework utilizes ARToolkit, a library for augmented reality applications, and is built using Robot Operating System (ROS). 
 \end{abstract}
 % IEEEtran.cls defaults to using nonbold math in the Abstract.
 % This preserves the distinction between vectors and scalars. However,
@@ -462,55 +456,74 @@ In section \ref{sec:problem}, we present our problem description. In section \re
 
 \section{Problem Description}
 \label{sec:problem}
-(I REALLY don’t know where to put this.. hard to fit in the intro, but clunky in its own section)
+(I don't know where to put this.. hard to fit in the intro, but clunky in its own section)
 
 The DymaFlight satellite is a microsatellite consisting of a base and an attached manipulator. 
 As a microsatellite, DymaFlight is smaller, lighter, faster, and lower cost due to its small size and mass; however, the size introduces significant coupled dynamics between the base and manipulator. 
-The dynamics between the base and the manipulator will be observed during testing in two main arenas: on an air bearing table, restricting the movement to a 2d plane, and in parabolic flight, simulating microgravity. 
+The dynamics between the base and the manipulator will be observed during testing in two main arenas: on an air bearing table, restricting the movement to a 2D plane, and in parabolic flight, simulating microgravity. 
 Pose data of the satellite base will be gathered during testing, requiring an efficient and low overhead pose tracking application capable of tracking in 6DOF space. 
 
 
 \section{Implementation}
 \label{sec:implementation}
-Our application is implemented using Robot Operating System (ROS). ROS is a library designed for robotic applications, and makes it easy for applications with several independent modules called nodes to communicate with each other. In addition, ROS provides a variety of visualization tools and libraries divided conceptually into packages. 
 
-The ar\_pose package \cite{arpose}  is a ROS wrapper for the ARToolkit library. 
-It provides two nodes that uses a video feed from a camera to track single and multiple markers.
-ARToolkit provides a function {\tt arGetTransMat()}that calculates the transformation matrix representing the transform of a given marker frame with respect to the camera frame. Once the transforms of the markers is retrieved, the original node outputs these transforms and displays the visualization for each marker. 
+\subsection{System Architecture}
+\label{sec:architecture}
+The application is implemented using Robot Operating System, or ROS. 
+ROS is a library designed for robotic applications, and makes it easy for several independent modules called nodes to communicate with each other. 
+In addition, ROS provides a variety of libraries, such as visualization tools, divided conceptually into packages. 
+Nodes communicate with other nodes using topics, which forward messages of specific types - for example, a node controlling a camera would broadcast messages with type {\tt Image}, on a topic named {\tt /camera/image\_raw}.
+
+The application serves two main functions: gathering data during parabolic flight, and processing the data for pose information; 
+the application consists of two ROS packages - {\tt flag\_data} for the data gathering portion, and a modified version of an existing package, {\tt ar\_pose} for pose extraction. 
+
 
 \begin{algorithm*}
-\caption{Multi Marker Detection - modified}\label{alg:multi}
-\begin{algorithmic}[1]
+\caption{Multi Marker Detection}\label{alg:multi}
+\begin{algorithmic}
+\State TODO make this prettier
 \State Detect all markers in camera image.
 \ForAll {expected markers}
-	\State Go through all detected markers that match expected marker, and choose marker with highest confidence value.
-	\If {expected marker was not found}
-		\State continue to next expected marker.
-	\Else
-		\State	Get transformation of marker frame with respect to camera frame.
-		\State  Lookup transformation of master frame with respect to given marker frame.	
-		\State  Calculate and return final transformation of master frame with respect to camera frame.
-	\EndIf
-\State  
+  \State Go through all detected markers that match expected marker, and choose marker with highest confidence value.
+  \If {expected marker was not found}
+    \State continue to next expected marker.
+  \Else
+    \State  Get transformation of marker frame with respect to camera frame.
+    \State  Lookup transformation of master frame with respect to given marker frame. 
+    \State  Calculate and return final transformation of master frame with respect to camera frame.
+  \EndIf
 \EndFor
 \end{algorithmic}
 \end{algorithm*}
 
 
-We implement an additional node to track a single object using multiple markers in algorithm \ref{alg:multi}. Our implementation modifies the original tracking algorithm to output the final, “master” visualization representing the pose of the actual tracked object instead of the individual markers. 
+\subsubsection{Data Gathering with flag\_data}
+The flag\_data package records and labels the needed data to later extract the pose of the satellite. 
+During parabolic flight, a series of parabolic arcs are executed to produce short periods of simulated weightlessness lasting around 25 seconds \cite{karmali2008dynamics}.  
+During each arc, the // manipulator will perform (several different motions), (where the reaction of the base to the manipulator movement will be measured.
+
+\subsubsection{Pose tracking with ar\_pose}
+The second portion is a modified version of the ar\_pose package, a ROS wrapper for the ARToolkit libary. 
+The ar\_pose package \cite{arpose}  is a ROS wrapper for the ARToolkit library. 
+It provides two nodes that uses a video feed from a camera to track single and multiple markers.
+ARToolkit provides a function {\tt arGetTransMat()}that calculates the transformation matrix representing the transform of a given marker frame with respect to the camera frame. Once the transforms of the markers is retrieved, the original node outputs these transforms and displays the visualization for each marker. 
+
+
+
+We implement an additional node to track a single object using multiple markers (see Algorithm \ref{alg:multi}). Our implementation modifies the original tracking algorithm to output the final, “master” visualization representing the pose of the actual tracked object instead of the individual markers. 
 Two input files are required - one that lists information for all markers that are being tracked, and one that lists the transformation matrices containing the rotational and positional offsets of each marker to the center of the object, modeling the object as a point.
-ARToolkit provides the transformation matrix representing the transform of a given marker with respect to the camera frame. To calculate the final transform of the master frame with respect to the camera frame, we //
+ARToolkit provides the transformation matrix representing the transform of a given marker with respect to the camera frame. To calculate the final transform of the master frame with respect to the camera frame, we compose the two known transforms as follows.
 
 \[^{cam}_{master}T = ^{cam}_{marker}T * ^{marker}_{master}T\]
 
-For testing, we attach one marker to each of the four outward sides of a rectangular box, simulating the base of the microsatellite.  
 Future optimizations (TODO)
 Because our application is designed to track a single object through the multiple markers, there is no need to look for all available markers - once a marker is found, the pose of the object itself can be calculated.
-*Insert a picture of the box here. (TODO)*
 
 \section{Results}
 \label{sec:results}
 
+For testing, we attach one marker to each of the four outward sides of a rectangular box, simulating the base of the microsatellite.  
+*Insert a picture of the box here. (TODO)*
 Results go here. 
 Possible tests - how does size of marker affect accuracy? what is most efficient placement of marker(s?) more than one marker per face for accuracy? 
 
