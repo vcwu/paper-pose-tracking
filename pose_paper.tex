@@ -442,33 +442,27 @@ The framework utilizes ARToolkit, a library for augmented reality applications, 
 
 
 \section{Introduction}
-Tracking the position and orientation of an object in real time is a problem that has several applications and uses. \cite{lepetit2005monocular} gives a broad overview of monocular, model based methods for 3D tracking of rigid objects, dividing the methods into marker and non-marker based. 
-For marker-free tracking, \cite{gordon2006and} uses feature extraction from several images to build an internal 3d model, then tracks pose using this model.
+Tracking the position and orientation of an object in real time is a problem that has several applications and uses. Lepetit \cite{lepetit2005monocular} gives a broad overview of monocular, model based methods for 3D tracking of rigid objects, dividing the methods into marker and non-marker based. 
+For marker-free tracking, Gordon \cite{gordon2006and} uses feature extraction from several images to build an internal 3d model, then tracks pose using this model.
 However, this approach assumes a static, unchanging object. 
 Marker based tracking does not necessarily have this constraint, as long as the marker's relative pose to the object stays constant. In marker based tracking, all tracking uses easily identifiable fiducial markers. 
-ARToolkit is a widely used library that enables marker based pose tracking. Much work has been done in using ARToolkit for pose tracking. \cite{piekarski2002using} uses ARToolkit to track the 3D position in real world coordinates of a user’s hand for mobile applications; \cite{wagner2007artoolkitplus} optimizes ARToolkit to produce ARToolkitPlus, a library tailored toward pose tracking on mobile devices.
+ARToolkit is a widely used library that enables marker based pose tracking. Much work has been done in using ARToolkit for pose tracking. Piekarski \cite{piekarski2002using} uses ARToolkit to track the 3D position in real world coordinates of a user's hand for mobile applications; Wagner \cite{wagner2007artoolkitplus} optimizes ARToolkit to produce ARToolkitPlus, a library tailored toward pose tracking on mobile devices.
 
-ARToolkit uses planar fiducial markers to track the position and orientation of the marker relative to the camera frame, and is easy to use and set up, requiring only a camera and the printed markers. However, there is a limit to the range of rotation where the fiducial is still recognizable - \cite{abawi2004accuracy} indicates that once the camera's relative angle to the marker is past 80 degrees (where 0 degrees is a full, non-angled view of the fiducial), the fiducial becomes undetectable. This becomes an issue when attempting to track an object that may rotate more than the detectable amount. 
+ARToolkit uses planar fiducial markers to track the position and orientation of the marker relative to the camera frame, and is easy to use and set up, requiring only a camera and the printed markers. However, there is a limit to the range of rotation where the fiducial is still recognizable - Abawi \cite{abawi2004accuracy} indicates that once the camera's relative angle to the marker is past 80 degrees (where 0 degrees is a full, non-angled view of the fiducial), the fiducial becomes undetectable. This becomes an issue when attempting to track an object that may rotate more than the detectable amount. 
 
-Our application is designed to track the pose of a rigid body through a full rotational, 6DOF space (how to word this??). We extend ar\_pose, an existing Robot Operating System (ROS) package, to track an object using multiple attached, non co-planar fiducial markers, thus overcoming the limitation of pattern visibility and extending the trackable range of rotation. 
+Our application is designed to track the pose of a rigid body through a full rotational, 6DOF space. We extend an existing Robot Operating System (ROS) package, {\tt ar\_pose}, to track an object using multiple attached, non co-planar fiducial markers, thus overcoming the limitation of pattern visibility and extending the trackable range of rotation. 
 
-In section \ref{sec:problem}, we present our problem description. In section \ref{sec:implementation}, we describe package implementation. We conclude in section \ref{sec:future} with a description of future work.
-
-\section{Problem Description}
-\label{sec:problem}
-(I don't know where to put this.. hard to fit in the intro, but clunky in its own section)
-
-The DymaFlight satellite is a microsatellite consisting of a base and an attached manipulator. 
-As a microsatellite, DymaFlight is smaller, lighter, faster, and lower cost due to its small size and mass; however, the size introduces significant coupled dynamics between the base and manipulator. 
+We use this application to track the pose of the DymaFlight satellite, a microsatellite consisting of a base and an attached manipulator.
+As a microsatellite, DymaFlight is smaller, lighter, faster, and lower cost due to its small size and mass.
+However, the small mass introduces significant coupled dynamics between the base and manipulator in zero - g; as the manipulator moves, the base will move in reaction as well.
+Measuring this reaction of the base will contribute to a more accurate understanding and eventual control algorithm for the manipulator.
 The dynamics between the base and the manipulator will be observed during testing in two main arenas: on an air bearing table, restricting the movement to a 2D plane, and in parabolic flight, simulating microgravity. 
-Pose data of the satellite base will be gathered during testing, requiring an efficient and low overhead pose tracking application capable of tracking in 6DOF space. 
 
+In section \ref{sec:implementation}, we describe package implementation. We conclude in section \ref{sec:future} with a description of future work.
 
 \section{Implementation}
 \label{sec:implementation}
 
-\subsection{System Architecture}
-\label{sec:architecture}
 The application is implemented using Robot Operating System, or ROS. 
 ROS is a library designed for robotic applications, and makes it easy for several independent modules called nodes to communicate with each other. 
 In addition, ROS provides a variety of libraries, such as visualization tools, divided conceptually into packages. 
@@ -497,14 +491,19 @@ the application consists of two ROS packages - {\tt flag\_data} for the data gat
 \end{algorithm*}
 
 
-\subsubsection{Data Gathering with flag\_data}
+\subsection{Data Gathering with flag\_data}
 The flag\_data package records and labels the needed data to later extract the pose of the satellite. 
-During parabolic flight, a series of parabolic arcs are executed to produce short periods of simulated weightlessness lasting around 25 seconds \cite{karmali2008dynamics}.  
-During each arc, the // manipulator will perform (several different motions), (where the reaction of the base to the manipulator movement will be measured.
+During parabolic flight, a series of parabolic arcs are executed to produce short periods of simulated weightlessness lasting around 25 seconds Karmali \cite{karmali2008dynamics}.  
+During each arc, the manipulator will perform several different motions while being recorded.
 
-\subsubsection{Pose tracking with ar\_pose}
-The second portion is a modified version of the ar\_pose package, a ROS wrapper for the ARToolkit libary. 
-The ar\_pose package \cite{arpose}  is a ROS wrapper for the ARToolkit library. 
+The flag\_data package presents a text based user interface to manually log the beginning and end of each test run during each parabolic arc. This logging allows users to parse out extraneous pose data.
+The package will also automatically record the data from the video feed, as well as IMU data to measure the vibrations where the camera is mounted.
+Recordings are made using rosbag, a tool provided by ROS that automatically records timestamped messages from topics. At the end of a session, all messages from the video feed and IMU are recorded in bag files and available for later playback.
+
+
+\subsection{Pose tracking with ar\_pose}
+The second portion is a modified version of the {\tt ar\_pose} package, a ROS wrapper for the ARToolkit libary. 
+The {\tt ar\_pose} package \cite{arpose}  is a ROS wrapper for the ARToolkit library. 
 It provides two nodes that uses a video feed from a camera to track single and multiple markers.
 ARToolkit provides a function {\tt arGetTransMat()}that calculates the transformation matrix representing the transform of a given marker frame with respect to the camera frame. Once the transforms of the markers is retrieved, the original node outputs these transforms and displays the visualization for each marker. 
 
