@@ -443,7 +443,7 @@ The framework utilizes ARToolkit, a library for augmented reality applications, 
 
 \section{Introduction}
 Tracking the position and orientation of an object in real time is a problem that has several applications and uses. Lepetit \cite{lepetit2005monocular} gives a broad overview of monocular, model based methods for 3D tracking of rigid objects, dividing the methods into marker and non-marker based. 
-For marker-free tracking, Gordon \cite{gordon2006and} uses feature extraction from several images to build an internal 3d model, then tracks pose using this model.
+For marker-free tracking, Gordon \cite{gordon2006and} uses feature extraction from several images to build an internal 3D model, then tracks pose using this model.
 However, this approach assumes a static, unchanging object. 
 Marker based tracking does not necessarily have this constraint, as long as the marker's relative pose to the object stays constant. In marker based tracking, all tracking uses easily identifiable fiducial markers. 
 ARToolkit is a widely used library that enables marker based pose tracking. Much work has been done in using ARToolkit for pose tracking. Piekarski \cite{piekarski2002using} uses ARToolkit to track the 3D position in real world coordinates of a user's hand for mobile applications; Wagner \cite{wagner2007artoolkitplus} optimizes ARToolkit to produce ARToolkitPlus, a library tailored toward pose tracking on mobile devices.
@@ -451,6 +451,13 @@ ARToolkit is a widely used library that enables marker based pose tracking. Much
 ARToolkit uses planar fiducial markers to track the position and orientation of the marker relative to the camera frame, and is easy to use and set up, requiring only a camera and the printed markers. However, there is a limit to the range of rotation where the fiducial is still recognizable - Abawi \cite{abawi2004accuracy} indicates that once the camera's relative angle to the marker is past 80 degrees (where 0 degrees is a full, non-angled view of the fiducial), the fiducial becomes undetectable. This becomes an issue when attempting to track an object that may rotate more than the detectable amount. 
 
 Our application is designed to track the pose of a rigid body through a full rotational, 6DOF space. We extend an existing Robot Operating System (ROS) package, {\tt ar\_pose}, to track an object using multiple attached, non co-planar fiducial markers, thus overcoming the limitation of pattern visibility and extending the trackable range of rotation. 
+
+\begin{figure}[h]
+	\includegraphics [width=1\columnwidth] {dymaflight}
+		\caption{DymaFlight satellite}
+			\label{fig:dymaflight}
+\end{figure}
+
 
 We use this application to track the pose of the DymaFlight satellite, a microsatellite consisting of a base and an attached manipulator.
 As a microsatellite, DymaFlight is smaller, lighter, faster, and lower cost due to its small size and mass.
@@ -493,50 +500,74 @@ the application consists of two ROS packages - {\tt flag\_data} for the data gat
 
 \subsection{Data Gathering with flag\_data}
 The flag\_data package records and labels the needed data to later extract the pose of the satellite. 
-During parabolic flight, a series of parabolic arcs are executed to produce short periods of simulated weightlessness lasting around 25 seconds Karmali \cite{karmali2008dynamics}.  
+During parabolic flight, a series of parabolic arcs are executed to produce short periods of simulated weightlessness lasting around 25 seconds \cite{karmali2008dynamics}.  
 During each arc, the manipulator will perform several different motions while being recorded.
 
 The flag\_data package presents a text based user interface to manually log the beginning and end of each test run during each parabolic arc. This logging allows users to parse out extraneous pose data.
 The package will also automatically record the data from the video feed, as well as IMU data to measure the vibrations where the camera is mounted.
 Recordings are made using rosbag, a tool provided by ROS that automatically records timestamped messages from topics. At the end of a session, all messages from the video feed and IMU are recorded in bag files and available for later playback.
 
-
 \subsection{Pose tracking with ar\_pose}
+
 The second portion is a modified version of the {\tt ar\_pose} package, a ROS wrapper for the ARToolkit libary. 
-The {\tt ar\_pose} package \cite{arpose}  is a ROS wrapper for the ARToolkit library. 
+The {\tt ar\_pose} package is a ROS wrapper for the ARToolkit library. 
 It provides two nodes that uses a video feed from a camera to track single and multiple markers.
-ARToolkit provides a function {\tt arGetTransMat()}that calculates the transformation matrix representing the transform of a given marker frame with respect to the camera frame. Once the transforms of the markers is retrieved, the original node outputs these transforms and displays the visualization for each marker. 
+
+\begin{figure}[h]
+	\includegraphics [width=1\columnwidth] {artoolkit-cs}
+		\caption{Transforms from arGetTransMat()}
+			\label{fig:ar-cs}
+\end{figure}
 
 
+ARToolkit provides a function {\tt arGetTransMat()}that calculates the transformation matrix representing the transform of the camera frame with respect to a given marker frame(see Figure \ref{fig:ar-cs}). 
+Once the transforms of the markers is retrieved, the original node outputs these transforms and displays the visualization for each marker. 
 
-We implement an additional node to track a single object using multiple markers (see Algorithm \ref{alg:multi}). Our implementation modifies the original tracking algorithm to output the final, “master” visualization representing the pose of the actual tracked object instead of the individual markers. 
+We implement an additional node, {\tt ar\_pose\_bundle}, to track a single object using multiple markers (see Algorithm \ref{alg:multi} and Figure \ref{fig:bundle-overview}). 
+Our implementation modifies the original tracking algorithm to output the final, “master” visualization representing the pose of the actual tracked object instead of the individual markers.
+
+\begin{figure}[h]
+	\includegraphics [width=1\columnwidth] {pose-bundle-arch}
+		\caption{ar\_pose\_bundle overview}
+			\label{fig:bundle-overview}
+\end{figure}
+
 Two input files are required - one that lists information for all markers that are being tracked, and one that lists the transformation matrices containing the rotational and positional offsets of each marker to the center of the object, modeling the object as a point.
-ARToolkit provides the transformation matrix representing the transform of a given marker with respect to the camera frame. To calculate the final transform of the master frame with respect to the camera frame, we compose the two known transforms as follows.
+ARToolkit provides the transformation matrix representing the transform of the camera frame with respect to a given marker frame. This transform is inverted to produce the transform of the marker frame with respect to the camera frame. To calculate the final transform of the master frame with respect to the camera frame, we compose the two known transforms as seen in equation \ref{eq:transform}.
+\begin{equation}\label{eq:transform}
+^{cam}_{master}T = ^{cam}_{marker}T * ^{marker}_{master}T
+\end{equation}
 
-\[^{cam}_{master}T = ^{cam}_{marker}T * ^{marker}_{master}T\]
+\begin{figure}[h]
+	\includegraphics [width=1\columnwidth] {modified-cs}
+		\caption{Finding master transform}
+			\label{fig:modified-cs}
+\end{figure}
 
-Future optimizations (TODO)
-Because our application is designed to track a single object through the multiple markers, there is no need to look for all available markers - once a marker is found, the pose of the object itself can be calculated.
 
-\section{Results}
+
+\section{Conclusion and Future Work}
 \label{sec:results}
 
-For testing, we attach one marker to each of the four outward sides of a rectangular box, simulating the base of the microsatellite.  
-*Insert a picture of the box here. (TODO)*
-Results go here. 
-Possible tests - how does size of marker affect accuracy? what is most efficient placement of marker(s?) more than one marker per face for accuracy? 
+
+A scaled down rectangular box was used for testing to simulate the base of the microsatellite. 
+Attached to each of the four outward sides of the box was a different fiducial; the fiducials' pattern information, size in millimeters, and pose in relation to the base center was encoded in the configuration files. 
+Pose output was visualized using rviz, a built in ROS package for visualization. 
+Due to different coordinate system conventions between ARToolkit and ROS, an extra transform was introduced before the visualization step to convert the pose from ARToolkit convention (z forward, x right, y down) to ROS convention (x forward, y left, z up). 
+
+Figure \ref{fig:rviz} shows a screenshot of the rviz output when running the application with a live camera feed; each marker's pose in the camera frame is represented by colored cubical markers, while the final master pose representing the center of the box is respresented by a 3D axis. 
+Because our application is designed to track a single object through the multiple markers, there is no need to look for all available markers - once a marker is found, the pose of the object itself can be calculated.
+
+\begin{figure}[h]
+	\includegraphics [width=1\columnwidth] {rviz-output}
+		\caption{Visualization of pose output using rviz}
+			\label{fig:rviz}
+\end{figure}
 
 marker size affect on accuracy
 \begin{itemize}
   	\item one HUGE marker on each face 
     \item two medium markers on each face
-\end{itemize}
-
-marker configuration affect on accuracy.
-\begin{itemize}
-  	\item one marker in center of each face 
-    \item two markers on each face, diagonally opposite 
-	\item four markers in each corner of each face ? (probably not feasible and overkill). 
 \end{itemize}
 \section{Future Work}
 \label{sec:future}
